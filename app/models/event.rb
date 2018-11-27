@@ -39,12 +39,8 @@ class Event < ApplicationRecord
 
     def slots(current_date)
       openings = openings_by_date(current_date)
-      return [] if !openings.exists? || is_weekend?(current_date)
+      return [] if !openings.exists?
       openings.map{ |o| slots_for_opening(o, current_date) }.flatten
-    end
-
-    def is_weekend?(date)
-      date.sunday? || date.saturday?
     end
 
     def slots_for_opening(opening, date)
