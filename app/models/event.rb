@@ -17,41 +17,50 @@ class Event < ApplicationRecord
             .where('EXTRACT(DOW FROM starts_at) = ?', date.wday))
   }
 
+  scope :appointments_by_date, lambda { |date|
+    appointments.where('starts_at <= ?', date).where('ends_at > ?', date)
+  }
+
   class << self
     def availabilities(start_date)
-      end_date = start_date + SCAN_DAYS.days
       result = []
       i = 0
-      current_result_date = start_date
-
+      current_date = start_date
       loop do
-        break if current_result_date >= end_date
-        result << {}
-        result[i][:date] = current_result_date
-        openings = openings_by_date(current_result_date)
-        result[i][:slots] = slots(current_result_date, openings)
+        break if current_date >= start_date + SCAN_DAYS.days
+        result << { date: current_date, slots: slots(current_date) }
         i += 1
-        current_result_date = start_date + i.days
+        current_date = start_date + i.days
       end
-
       result
     end
 
     private
 
-    def slots(current_result_date, openings)
+    def slots(current_date)
+      openings = openings_by_date(current_date)
+      return [] if !openings.exists? || is_weekend?(current_date)
+      openings.map{ |o| slots_for_opening(o, current_date) }.flatten
+    end
+
+    def is_weekend?(date)
+      date.sunday? || date.saturday?
+    end
+
+    def slots_for_opening(opening, date)
       result = []
-      return result if openings.length == 0 || current_result_date.sunday? || current_result_date.saturday?
-      openings.each do |o|
-        current_starts_at = o.starts_at
-        loop do
-          break if (current_starts_at + INTERVAL) > o.ends_at
-          result << current_starts_at.strftime('%-H:%M')
-          current_starts_at += INTERVAL
-        end
+      starts_at = opening.starts_at
+      loop do
+        break if (starts_at + INTERVAL) > opening.ends_at
+        result << starts_at.strftime('%-H:%M') unless booked?(date, starts_at)
+        starts_at += INTERVAL
       end
-      result.uniq
+      result
+    end
+
+    def booked?(date, time)
+      datetime_str = [date.strftime('%F'), time.strftime('%H:%M')].join(' ')
+      appointments_by_date(DateTime.parse(datetime_str)).exists?
     end
   end
-
 end
