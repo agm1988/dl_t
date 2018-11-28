@@ -21,24 +21,233 @@ RSpec.describe Event, type: :model do
     expect(availabilities.length).to eq 7
   end
 
-  it 'raises ArgumentError if passing date is invalid'
-  it 'returns an empty array if there are no openings'
-  it 'returns one timeslot if the opening lasts 30 minutes'
-  it 'returns date with its openings timeslots'
-  it 'returns array of multiple dates with their openings timeslots'
-  it 'returns dates ordered'
-  it 'returns timeslots ordered within dates'
-  it 'keeps order of timeslots of different openings for the same date'
-  it 'returns timeslots starting with 00:00'
-  it 'returns timeslots up to 24:00'
-  it 'returns date with adjacent timeslots of different openings'
-  it 'returns adjacent dates with adjacent timeslots'
-  it 'does not return opening timeslots when they are booked'
+  it 'returns one timeslot if the opening lasts 30 minutes' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 10:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['9:30']
+  end
+
+  it 'returns date with its openings timeslots' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30']
+  end
+
+  it 'returns array of multiple dates with their openings timeslots' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-11 12:30'),
+                 ends_at: DateTime.parse('2014-08-11 13:30'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30']
+    expect(availabilities[1][:date]).to eq Date.new(2014, 8, 11)
+    expect(availabilities[1][:slots]).to eq ['12:30', '13:00']
+  end
+
+  it 'returns dates ordered' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30', '12:30', '13:00']
+  end
+
+  it 'returns recurring openings for the actual date and the next weeks' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-04 10:30'),
+                 ends_at: DateTime.parse('2014-08-04 12:00'),
+                 weekly_recurring: true
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 10:00'),
+                 ends_at: DateTime.parse('2014-08-10 11:30'),
+                 weekly_recurring: true
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-16 09:30'),
+                 ends_at: DateTime.parse('2014-08-16 11:00'),
+                 weekly_recurring: true
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-16')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 16)
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30']
+    expect(availabilities[1][:date]).to eq Date.new(2014, 8, 17)
+    expect(availabilities[1][:slots]).to eq ['10:00', '10:30', '11:00']
+    expect(availabilities[2][:date]).to eq Date.new(2014, 8, 18)
+    expect(availabilities[2][:slots]).to eq ['10:30', '11:00', '11:30']
+  end
+
+  it 'returns timeslots ordered within dates' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-11 10:30'),
+                 ends_at: DateTime.parse('2014-08-11 12:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-12 10:00'),
+                 ends_at: DateTime.parse('2014-08-12 11:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[1][:date]).to eq Date.new(2014, 8, 11)
+    expect(availabilities[2][:date]).to eq Date.new(2014, 8, 12)
+  end
+
+  it 'keeps order of timeslots of different openings for the same date' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 15:00'),
+                 ends_at: DateTime.parse('2014-08-10 16:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    slots = ['9:30', '10:00', '10:30', '12:30', '13:00', '15:00', '15:30']
+    expect(availabilities[0][:slots]).to eq slots
+  end
+
+  it 'returns timeslots starting with 00:00' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 00:00'),
+                 ends_at: DateTime.parse('2014-08-10 01:30'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['0:00', '0:30', '1:00']
+  end
+
+  it 'returns timeslots up to 23:30' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 22:30'),
+                 ends_at: DateTime.parse('2014-08-10 24:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['22:30', '23:00', '23:30']
+  end
+
+  it 'returns date with adjacent timeslots of different openings' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 13:30'),
+                 ends_at: DateTime.parse('2014-08-10 15:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    slots = ['12:30', '13:00', '13:30', '14:00', '14:30']
+    expect(availabilities[0][:slots]).to eq slots
+  end
+
+  it 'does not return opening timeslots when they are booked' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 14:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['13:30']
+  end
+
   it "does not return any timeslots of the opening "\
-     "that was booked completely with the same appointment"
+     "that was booked completely" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq []
+  end
+
   it "does not return adjacent timeslots from different openings "\
-     "booked with the same appointment"
-  it 'does not return any opening timeslots when they are all booked'
+     "booked with the same appointment" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 11:30'),
+                 ends_at: DateTime.parse('2014-08-10 12:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 12:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 12:00'),
+                 ends_at: DateTime.parse('2014-08-10 13:00')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['11:30', '13:00']
+  end
+
+  it "does not return opening timeslots when they are booked"\
+     "with different appointments" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 11:30'),
+                 ends_at: DateTime.parse('2014-08-10 15:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 12:00'),
+                 ends_at: DateTime.parse('2014-08-10 13:30')
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 14:00'),
+                 ends_at: DateTime.parse('2014-08-10 15:00')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['11:30', '13:30', '15:00']
+  end
 
   # To bring more consistency to the algorithm I had to make some assumptions:
   #
@@ -62,13 +271,87 @@ RSpec.describe Event, type: :model do
   # the task directly. Rather than that I'm going to document the algorithm
   # with the specs for those restrictions.
 
-  it 'does not count duplicate timeslots twice'
+  it 'counts duplicate timeslots twice' do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    Event
+      .new(kind: 'opening',
+           starts_at: DateTime.parse('2014-08-10 09:30'),
+           ends_at: DateTime.parse('2014-08-10 11:00'),
+           weekly_recurring: false)
+      .save(validate: false)
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(Event.count).to eq 2
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30']
+  end
+
   it "returns the correct sets of opening timeslots "\
-     "when there are overlapping appointments"
+     "when there are overlapping appointments" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 09:30'),
+                 ends_at: DateTime.parse('2014-08-10 11:00'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 10:00'),
+                 ends_at: DateTime.parse('2014-08-10 11:30'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30', '11:00']
+  end
+
   it "does not count timeslots after 24:00 of the opening "\
-     "which has ends_at with the next day"
-  it "does not take into account erroneous appointments "\
-     "(those that do not match openings)"
+     "which has ends_at with the next day" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 23:00'),
+                 ends_at: DateTime.parse('2014-08-11 01:00'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
+    expect(availabilities[0][:slots]).to eq ['23:00', '23:30']
+    expect(availabilities[1][:date]).to eq Date.new(2014, 8, 11)
+    expect(availabilities[1][:slots]).to eq []
+  end
+
+  it "does not take into account appointments "\
+     "that do not match openings" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 11:30'),
+                 ends_at: DateTime.parse('2014-08-10 14:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 12:00'),
+                 ends_at: DateTime.parse('2014-08-10 13:30')
+
+    Event.create kind: 'appointment',
+                 starts_at: DateTime.parse('2014-08-10 15:30'),
+                 ends_at: DateTime.parse('2014-08-10 16:30')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['11:30', '13:30', '14:00']
+  end
+
   it "does not show timeslots for the openings with the same time in "\
-     "starts_at and ends_at"
+     "starts_at and ends_at" do
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 11:30'),
+                 ends_at: DateTime.parse('2014-08-10 12:30'),
+                 weekly_recurring: false
+
+    Event.create kind: 'opening',
+                 starts_at: DateTime.parse('2014-08-10 13:30'),
+                 ends_at: DateTime.parse('2014-08-10 13:30'),
+                 weekly_recurring: false
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    expect(availabilities[0][:slots]).to eq ['11:30', '12:00']
+  end
 end
