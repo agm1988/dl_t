@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2018_11_29_190733) do
+ActiveRecord::Schema.define(version: 2018_12_01_131432) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -22,8 +22,9 @@ ActiveRecord::Schema.define(version: 2018_11_29_190733) do
     t.boolean "weekly_recurring"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["kind", "starts_at", "ends_at"], name: "index_events_on_kind_and_starts_at_and_ends_at"
-    t.index ["kind", "weekly_recurring", "starts_at"], name: "index_events_on_kind_and_weekly_recurring_and_starts_at"
+    t.index "date_part('dow'::text, starts_at)", name: "index_events_recurring_openings_on_starts_at_dow", where: "(((kind)::text = 'opening'::text) AND (weekly_recurring = true))"
+    t.index ["starts_at", "ends_at"], name: "index_events_appointments_on_starts_at_and_ends_at", where: "((kind)::text = 'appointment'::text)"
+    t.index ["starts_at"], name: "index_events_not_recurring_openings_on_starts_at", where: "(((kind)::text = 'opening'::text) AND (weekly_recurring = false))"
   end
 
 end
