@@ -29,16 +29,13 @@ class Event < ApplicationRecord
   class << self
     def availabilities(start_date)
       result = []
-      i = 0
       current_date = start_date
       appointments = appointments_by_date(current_date)
                        .pluck(:starts_at, :ends_at)
-      loop do
-        break if current_date >= start_date + SCAN_DAYS.days
+      SCAN_DAYS.times do |i|
         result << { date: current_date,
                     slots: slots(current_date, appointments) }
-        i += 1
-        current_date = start_date + i.days
+        current_date = start_date + (i+1).days
       end
       result
     end
@@ -49,17 +46,17 @@ class Event < ApplicationRecord
       openings = openings_by_date(current_date)
                    .pluck(:starts_at, :ends_at)
       return [] unless openings.length > 0
-      result = openings.map do |o|
+      openings.map! do |o|
         slots_for_opening(o, appointments, current_date)
       end
-      result.flatten.uniq
+      openings.flatten.uniq
     end
 
     def slots_for_opening(opening, appointments, date)
       result = []
       starts_at = opening[0]
       loop do
-        break if last_slot?(opening, starts_at)
+        break if last_slot?(opening, starts_at + INTERVAL)
         unless booked?(appointments, date, starts_at)
           result << starts_at.strftime('%-H:%M')
         end
@@ -68,16 +65,20 @@ class Event < ApplicationRecord
       result
     end
 
-    def last_slot?(opening, current_starts_at)
-      starts_at = current_starts_at + INTERVAL
-      next_day_beginning = opening[0].tomorrow.beginning_of_day
-      starts_at > opening[1] || starts_at > next_day_beginning
+    def last_slot?(opening, starts_at)
+      starts_at > opening[1] ||
+        starts_at > opening[0].tomorrow.beginning_of_day
     end
 
     def booked?(appointments, date, time)
       return false unless appointments.length > 0
-      datetime_str = [date.strftime('%F'), time.strftime('%H:%M')].join(' ')
-      datetime = DateTime.parse datetime_str
+      date_str = date.strftime('%F')
+      time_str = time.strftime('%H:%M')
+      datetime = DateTime.new(date_str[0, 4].to_i,
+                              date_str[5, 2].to_i,
+                              date_str[8, 2].to_i,
+                              time_str[0, 2].to_i,
+                              time_str[3,2].to_i)
       appointments.count { |x| x[0] <= datetime && x[1] > datetime } > 0
     end
   end
