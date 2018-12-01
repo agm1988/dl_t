@@ -23,7 +23,7 @@ class Event < ApplicationRecord
   scope :appointments_by_date, lambda { |date|
     appointments.where('starts_at >= ? AND ends_at <= ?',
                        date.beginning_of_day,
-                       date.end_of_day + (SCAN_DAYS-1).days)
+                       date.end_of_day + 1.day)
   }
 
   class << self
@@ -33,11 +33,18 @@ class Event < ApplicationRecord
       appointments = appointments_by_date(current_date)
                        .pluck(:starts_at, :ends_at)
       SCAN_DAYS.times do |i|
+        app_slots = appointments_by_date(current_date).slots1
+        op_slots = openings_by_date(current_date).slots1
         result << { date: current_date,
-                    slots: slots(current_date, appointments) }
+                    slots: (op_slots - app_slots) }
         current_date = start_date + (i+1).days
       end
       result
+    end
+
+    def slots1
+      select('generate_series("events"."starts_at", ("events"."ends_at" - \'30 minutes\'::interval), \'30 minutes\'::interval) as slots')
+        .map { |s| s.slots.strftime('%-H:%M') }.uniq
     end
 
     private
