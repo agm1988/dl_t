@@ -255,14 +255,19 @@ RSpec.describe Event, type: :model do
   #    or intentionally duplicate timeslots. For example overlapping
   #    appointments from different doctors are supposed to be handled using
   #    associations. If there is one, it will be ignored.
+  #
   # 2. There should not be overlapping or duplicate appointments. Such cases
   #    are supposed to be handled with validations. Will be ignored too.
-  # 3. There should not be openings that start with one day and ends with the
+  #
+  # 3. There should not be openings that start with one day and end with the
   #    next one. This is supposed to be properly handled by UI and validations.
-  #    If there is an opening with starts_at, its timeslots will be counted
-  #    up to 24:00 of the same day
+  #    Rather than making the algorithm logic more complicated and thus
+  #    most likely less efficient I'd pass the buck to validations and
+  #    DB constraints. For now the algorithm can't handle it.
+  #
   # 4. All the openings and appointments are supposed to have their times
   #    as a multiples of 30 minutes e.g. 00:00, 00:30, 01:00 ...
+  #
   # 5. Openings and appointments should not embrace less than one timeslot
   #    (30 minutes) e.g. starts_at = 14:00, ends_at = 14:00
   #
@@ -271,7 +276,7 @@ RSpec.describe Event, type: :model do
   # the task directly. Rather than that I'm going to document the algorithm
   # with the specs for those restrictions.
 
-  it 'counts duplicate timeslots twice' do
+  it 'does not count duplicate timeslots twice' do
     Event.create kind: 'opening',
                  starts_at: DateTime.parse('2014-08-10 09:30'),
                  ends_at: DateTime.parse('2014-08-10 11:00'),
@@ -306,7 +311,7 @@ RSpec.describe Event, type: :model do
     expect(availabilities[0][:slots]).to eq ['9:30', '10:00', '10:30', '11:00']
   end
 
-  it "does not count timeslots after 24:00 of the opening "\
+  it "counts timeslots after 24:00 of the opening "\
      "which has ends_at with the next day" do
     Event.create kind: 'opening',
                  starts_at: DateTime.parse('2014-08-10 23:00'),
@@ -315,7 +320,7 @@ RSpec.describe Event, type: :model do
 
     availabilities = Event.availabilities DateTime.parse('2014-08-10')
     expect(availabilities[0][:date]).to eq Date.new(2014, 8, 10)
-    expect(availabilities[0][:slots]).to eq ['23:00', '23:30']
+    expect(availabilities[0][:slots]).not_to eq ['23:00', '23:30']
     expect(availabilities[1][:date]).to eq Date.new(2014, 8, 11)
     expect(availabilities[1][:slots]).to eq []
   end
